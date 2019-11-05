@@ -1,0 +1,157 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+```{r}
+## Loading Libraries
+
+library(RColorBrewer)
+library(tm)
+library(wordcloud)
+library(RWeka)
+library(caret)
+library(rminer)
+library(e1071)
+library(FSelector)
+library(party)
+library(kernlab)
+library(textstem)
+library(sentimentr)
+library(gtools)
+
+## Reading data files . Data was already divided into train and test data
+
+data= read.delim("C:/Users/saraz/Downloads/drugsCom_raw/drugsComTrain_raw.tsv", sep = '\t', header = TRUE,na.strings=c("","NA"),stringsAsFactors = FALSE)
+test= read.delim("C:/Users/saraz/Downloads/drugsCom_raw/drugsComTest_raw.tsv", sep = '\t', header = TRUE,na.strings = c("","NA"),stringsAsFactors = FALSE)
+
+## Checking for any missing data and removing them
+sum(is.na(data))
+sum(is.na(test))
+data1<-data[complete.cases(data), ]
+test1<-test[complete.cases(test),]
+
+## Getting the sentiment values of the reviews using the sentimentr package for both test and train data.Using quantcut to balance out dataset.
+
+sentences<- sentimentr::get_sentences(data1$review)
+sentiments<-sentiment(sentences)
+avg_sentiment<-aggregate(sentiments$sentiment, by=list(sentiments$element_id), FUN=sum)
+round(avg_sentiment$x,2)
+train_data<- cbind(data1,round(avg_sentiment$x,2))
+names(train_data)<-c("ID","Drug","condition","review","rating","date","Hit_count","sentiment")
+quantcut(train_data$sentiment,q=5)
+
+## Refactorising sentiment scores on a 5 scale basis for both datasets
+train_data$sentiment[train_data$sentiment > -7.06 & train_data$sentiment < -0.77] <- 'VeryNegative'
+train_data$sentiment[train_data$sentiment <= -0.35] <- 'Negative'
+train_data$sentiment[train_data$sentiment > -0.35 & train_data$sentiment < 0.11] <- 'Neutral'
+train_data$sentiment[train_data$sentiment >= 0.11 & train_data$sentiment <= 0.55] <- 'Positive'
+train_data$sentiment[train_data$sentiment > 0.55 & train_data$sentiment <= 6.27] <- 'VeryPositive'
+
+
+sentencest<- sentimentr::get_sentences(test1$review)
+tsentiments<-sentiment(sentencest)
+avg_sentiment_test<-aggregate(tsentiments$sentiment, by=list(tsentiments$element_id), FUN=sum)
+test_data<- cbind(test1,round(avg_sentiment_test$x,2))
+names(test_data)<-c("ID","Drug","condition","review","rating","date","Hit_count","sentiment")
+test_data$sentiment[test_data$sentiment > -7.06 & test_data$sentiment < -0.77] <- 'VeryNegative'
+test_data$sentiment[test_data$sentiment <= -0.35] <- 'Negative'
+test_data$sentiment[test_data$sentiment > -0.35 & test_data$sentiment < 0.11] <- 'Neutral'
+test_data$sentiment[test_data$sentiment >= 0.11 & test_data$sentiment <= 0.55] <- 'Positive'
+test_data$sentiment[test_data$sentiment > 0.55 & test_data$sentiment <= 6.27] <- 'VeryPositive'
+
+## Cleaning Data- converting emojis first as they carry some sentiment score,then removing special comma representations(&#039,quot),removing english stop words and domain based stop words.Domain stop words removed from following the medhelp book,followed by lemmatization and stemming.removing punctuation after emoji conversion and stripping whitspace.
+
+
+data2 <- lapply(data1, iconv, to = "UTF-8")
+test2 <- lapply(test1, iconv, to = "UTF-8")
+data3<-replace_emoji(data2$review)
+test3<-replace_emoji(test2$review)
+
+
+corpus<- Corpus(VectorSource(data3))
+
+corpus <- tm_map(corpus, tolower)
+inspect(corpus[1:5])
+corpus <- tm_map(corpus, content_transformer(gsub), pattern = "&#039;", replacement="'")
+corpus <- tm_map(corpus, content_transformer(gsub), pattern = "&quot;", replacement="'")
+corpus<-tm_map(corpus,removeWords,stopwords("english"))
+
+corpus<-tm_map(corpus,removePunctuation)
+corpus<-tm_map(corpus,removeWords,stopwords("english"))
+medstop<- c("disease"," diseases"," disorder"," symptom"," symptoms"," drug"," drugs","problems"," problem","prob"," probs"," med"," meds","pill"," pills"," medicine"," medicines"," medication"," medications"," treatment"," treatments"," caps"," capsules"," capsule","tablet"," tablets"," tabs"," doctor"," dr","  doc"," physician"," physicians"," test"," tests"," testing"," specialist"," specialists","side-effect"," side-effects", "pharmaceutical","pharmaceuticals","pharma","diagnosis","diagnose","diagnosed","exam","challenge","device"," condition"," conditions"," suffer"," suffering ","suffered"," feel"," feeling"," prescription","prescribe","prescribed"," over-the-counter"," otc","almost","also", "although", "always", "among","either","periods","enough","especially","etc","however","especially","rather","regarding","really","just","sex","mainly","nearly","hey","years","litres","time")
+corpus<-tm_map(corpus,removeWords,medstop)
+corpus<- lemmatize_words(corpus)
+
+corpus<-tm_map(corpus,stemDocument)
+inspect(corpus[1:20])
+
+
+inspect(corpus[1:20])
+
+corpus<-tm_map(corpus,stripWhitespace)
+
+##Performing cleaning using same steps on the test dataset
+
+tcorpus<- Corpus(VectorSource(test3))
+
+tcorpus <- tm_map(tcorpus, tolower)
+inspect(tcorpus[1:5])
+tcorpus <- tm_map(tcorpus, content_transformer(gsub), pattern = "&#039;", replacement="'")
+tcorpus <- tm_map(tcorpus, content_transformer(gsub), pattern = "&quot;", replacement="'")
+
+
+tcorpus<-tm_map(tcorpus,removePunctuation)
+tcorpus<-tm_map(tcorpus,removeWords,stopwords("english"))
+
+tcorpus<-tm_map(tcorpus,removeWords,medstop)
+tcorpus<- lemmatize_words(tcorpus)
+
+tcorpus<-tm_map(tcorpus,stemDocument)
+
+nontextual_train<- cbind(train_data[,1:3],train_data[,5:7])
+nontextual_test<- cbind(test_data[,1:3],test_data[,5:7])
+
+
+# Tokenizing using Bag of words and TFIDF
+
+Ngram <- function(x)NGramTokenizer(x,Weka_control(min = 1,max=3 ))
+train_BOW_dtm<- DocumentTermMatrix(corpus,control = list(tokenize = Ngram , weighting=weightTfIdf))
+
+## Creating sparse matrix and finding Frequent terms . 
+train_BOW_dtm1 <-removeSparseTerms(train_BOW_dtm,0.94)
+train_BOW_dtm2 <- as.matrix(train_BOW_dtm1)
+train_BOW <-findFreqTerms(train_BOW_dtm1)
+train_data_model_BOW <- data.frame(x=train_data$sentiment,nontextual_train,train_BOW_dtm2)
+test_BOW_dtm <- DocumentTermMatrix(tcorpus,control = list(tokenize = Ngram , weighting=weightTfIdf,dictionary=train_BOW))
+test_BOW_dtm <- as.matrix(test_BOW_dtm)
+test_data_model_BOW <- data.frame(y=test_data$sentiment,nontextual_test,test_BOW_dtm)
+
+
+###Feature Selection using Information gain
+inf<-information.gain(x~.,train_data_model_BOW)
+inf_wts<-cutoff.k(inf,106)
+
+## Building Model using the new words found using Feature selection
+
+train_data_model_BOW1 <- data.frame(train_data_model_BOW$x,train_data_model_BOW[inf_wts])
+test_data_model_BOW1 <- data.frame(test_data_model_BOW$y,test_data_model_BOW[inf_wts])
+
+# NaiveBayes Classifier
+BOW_NB <-naiveBayes(train_data_model_BOW.x~.,data = train_data_model_BOW1)
+test_NB_Pred <- predict(BOW_NB, newdata= test_data_model_BOW1)
+confusionMatrix(test_NB_Pred,test_data_model_BOW1[,1])
+
+
+```
+
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
