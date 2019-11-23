@@ -1,0 +1,23 @@
+Ngram <- function(x)NGramTokenizer(x,Weka_control(min = 1,max=3 ))
+train_BOW_dtm<- DocumentTermMatrix(corpus,control = list(tokenize = Ngram , weighting=weightTfIdf)
+
+## Creating sparse matrix and finding Frequent terms . 
+train_BOW_dtm1 <-removeSparseTerms(train_BOW_dtm,0.95)
+train_BOW_dtm2 <- as.matrix(train_BOW_dtm1)
+train_BOW <-findFreqTerms(train_BOW_dtm1)
+train_data_model_BOW <- data.frame(sentiment=train_data$sentiment,nontextual_train,train_BOW_dtm2)
+test_BOW_dtm <- DocumentTermMatrix(tcorpus,control = list(tokenize = Ngram , weighting=weightTfIdf,dictionary=train_BOW))
+test_BOW_dtm <- as.matrix(test_BOW_dtm)
+test_data_model_BOW <- data.frame(sentiment=test_data$sentiment,nontextual_test,test_BOW_dtm)
+
+
+####### Information Gain Feature selection
+inf<-FSelector::information.gain(sentiment~.,train_data_model_BOW)
+inf_wts<-FSelector::cutoff.k(inf,57)
+formula <- FSelector::as.simple.formula(inf_wts,'sentiment')
+print(formula)
+
+#### Stepwise Backward Regression
+full.model<- multinom(formula,data=train_data_model_BOW)
+step(full.model, data = train_data_model_BOW, direction = "backward")
+
