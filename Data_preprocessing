@@ -1,0 +1,38 @@
+## Cleaning Data- converting emojis first as they carry some sentiment score,then removing special comma representations(&#039,quot),removing english stop words and domain based stop words.Domain stop words removed from following the medhelp book,followed by lemmatization .removing punctuation after emoji conversion and stripping whitspace.
+
+
+train<- lapply(train_data, iconv, to = "UTF-8")
+test <- lapply(test_data, iconv, to = "UTF-8")
+train1<- textclean::replace_emoji(train$review)
+test1<-textclean::replace_emoji(test$review)
+
+library(tm)
+corpus<- Corpus(VectorSource(train1))
+
+corpus <- tm_map(corpus, tolower)
+inspect(corpus[1:5])
+corpus <- tm_map(corpus, content_transformer(gsub), pattern = "&#039;", replacement="'")
+corpus <- tm_map(corpus, content_transformer(gsub), pattern = "&quot;", replacement="'")
+corpus<-tm_map(corpus,removeWords,stopwords("english"))
+
+corpus<-tm_map(corpus,removePunctuation)
+corpus<-tm_map(corpus,removeWords,stopwords("english"))
+medstop<- c("disease"," diseases"," disorder"," symptom"," symptoms"," drug"," drugs","problems"," problem","prob"," probs"," med"," meds","pill"," pills"," medicine"," medicines"," medication", "medications"," treatment"," treatments"," caps"," capsules"," capsule","tablet"," tablets"," tabs", "doctor"," dr","  doc"," physician"," physicians"," test"," tests"," testing"," specialist"," specialists","side-effect","give"," side-effects","ago","take","months","days","month","day","morning","evening","night", "pharmaceutical","pharmaceuticals","pharma","diagnosis","diagnose","diagnosed","exam","challenge","device"," condition"," conditions"," suffer"," suffering ","suffered"," feel"," feeling"," prescription","prescribe","prescribed"," over-the-counter"," otc","almost","also", "although", "always", "among","either","periods","enough","especially","etc","however","especially","rather","regarding","really","just","sex","mainly","nearly","hey","years","litres","time")
+corpus<-tm_map(corpus,removeWords,medstop)
+corpus<- textstem::lemmatize_words(corpus)
+corpus<-tm_map(corpus,stripWhitespace)
+
+##Performing cleaning using same steps on the test dataset
+
+tcorpus<- Corpus(VectorSource(test1))
+tcorpus <- tm_map(tcorpus, tolower)
+tcorpus <- tm_map(tcorpus, content_transformer(gsub), pattern = "&#039;", replacement="'")
+tcorpus <- tm_map(tcorpus, content_transformer(gsub), pattern = "&quot;", replacement="'")
+tcorpus<-tm_map(tcorpus,removePunctuation)
+tcorpus<-tm_map(tcorpus,removeWords,stopwords("english"))
+tcorpus<-tm_map(tcorpus,removeWords,medstop)
+tcorpus<- textstem::lemmatize_words(tcorpus)
+tcorpus<-tm_map(tcorpus,stripWhitespace)
+
+nontextual_train<- cbind(train_data[,1],train_data[,5],train_data[,7])
+nontextual_test<- cbind(test_data[,1],test_data[,5],test_data[,7])
