@@ -1,0 +1,32 @@
+data= read.delim("C:/Users/saraz/Downloads/drugsCom_raw/drugsComTrain_raw.tsv", sep = '\t', header = TRUE,na.strings=c("","NA"),stringsAsFactors = FALSE)
+test= read.delim("C:/Users/saraz/Downloads/drugsCom_raw/drugsComTest_raw.tsv", sep = '\t', header = TRUE,na.strings = c("","NA"),stringsAsFactors = FALSE)
+
+## Checking for any missing data and removing them
+sum(is.na(data))
+sum(is.na(test))
+data1<-data[complete.cases(data), ]
+test1<-test[complete.cases(test),]
+
+full_dataset<- rbind(data1,test1)
+
+## Getting the sentiment values of the reviews using the sentimentr package for both test and train data.Using quantcut to balance out dataset.
+
+sentences<- sentimentr::get_sentences(full_dataset$review)
+sentiments<-sentimentr::sentiment(sentences)
+avg_sentiment<-aggregate(sentiments$sentiment, by=list(sentiments$element_id), FUN=sum)
+
+full_datawith_sentiment<- cbind(full_dataset,round(avg_sentiment$x,2))
+names(full_datawith_sentiment)<-c("ID","Drug","condition","review","rating","date","Hit_count","sentiment")
+gtools::quantcut(full_datawith_sentiment$sentiment,q=5)
+
+## Refactorising sentiment scores on a 5 scale basis for full datasets
+full_datawith_sentiment$sentiment[full_datawith_sentiment$sentiment > -7.06 & full_datawith_sentiment$sentiment < -0.77] <- 'VeryNegative'
+full_datawith_sentiment$sentiment[full_datawith_sentiment$sentiment <= -0.40] <- 'Negative'
+full_datawith_sentiment$sentiment[full_datawith_sentiment$sentiment >= -0.41 & full_datawith_sentiment$sentiment < 0.11] <- 'Neutral'
+full_datawith_sentiment$sentiment[full_datawith_sentiment$sentiment >= 0.11 & full_datawith_sentiment$sentiment <= 0.55] <- 'Positive'
+full_datawith_sentiment$sentiment[full_datawith_sentiment$sentiment > 0.55 & full_datawith_sentiment$sentiment <= 6.27] <- 'VeryPositive'
+
+mysplit<-caTools::sample.split(full_datawith_sentiment,SplitRatio = 0.70)
+
+train_data<- subset(full_datawith_sentiment,mysplit==T)
+test_data<-  subset(full_datawith_sentiment,mysplit==F)
