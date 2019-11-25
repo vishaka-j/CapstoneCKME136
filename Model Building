@@ -1,0 +1,93 @@
+formula <- FSelector::as.simple.formula(inf_wts,'sentiment')
+print(formula)
+
+###### Information Gain
+# NaiveBayes Classifier
+
+BOW_NB <-e1071::naiveBayes(formula, data = train_data_model_BOW)
+train_NB_pred<-predict(BOW_NB, newdata= train_data_model_BOW)
+caret::confusionMatrix(train_NB_pred,train_data_model_BOW[,1],mode="prec_recall")
+test_NB_Pred <- predict(BOW_NB, newdata= test_data_model_BOW)
+caret::confusionMatrix(test_NB_Pred,test_data_model_BOW[,1],mode="prec_recall")
+
+# Decision Tree
+BOW_ctree <-party::ctree(formula,data =train_data_model_BOW)
+train_ctree_pred<-predict(BOW_NB, newdata= train_data_model_BOW)
+test_ctree_Pred <- predict(BOW_ctree, newdata= test_data_model_BOW)
+caret::confusionMatrix(test_ctree_Pred,test_data_model_BOW[,1],mode="prec_recall")
+
+# Random Forest
+BOW_RF <-randomForest::randomForest(formula,data =train_data_model_BOW,mtry=10,nTree=100,doTrace=TRUE)
+train_RF_pred<-predict(BOW_RF, newdata= train_data_model_BOW)
+test_RF_Pred <- predict(BOW_RF, newdata= test_data_model_BOW)
+caret::confusionMatrix(test_RF_Pred,test_data_model_BOW[,1],mode="prec_recall")
+
+#Support Vector Machine
+BOW_svm<-e1071::svm(sentiment ~.,data = train_data_model_BOW,kernel="linear")
+train_svm_Pred <- predict(BOW_svm, newdata= train_data_model_BOW)
+test_svm_Pred<- predict(BOW_svm, newdata= test_data_model_BOW)
+confusionMatrix(train_svm_Pred,train_data_model_BOW[,1],mode="prec_recall")
+confusionMatrix(test_svm_Pred,test_data_model_BOW[,1],mode="prec_recall")
+
+
+##### HYBRID FEATURE SELECTION
+## Naive BAyes
+train_control <- trainControl(method="cv", number=5)
+BOW_NB <-train(sentiment ~ X2 + anxiety + worse + horrible + 
+    severe + great + works + better + taking + effects + depression + 
+    nausea + stopped + first + weight + worked + still + helped + 
+    birth + headaches + control + never + recommend + weeks + 
+    doctor + X3 + since + sleep + little + medication + every + 
+    later + tried + hours + using + medicine + experience + times + 
+    right + taken + effect + normal + without + finally + nothing + 
+    thing + period + within + cramps + experienced + noticed + 
+    around,data =train_data_model_BOW,method="nb",trControl=train_control)
+
+test_NB_Pred <- predict(BOW_NB, newdata= test_data_model_BOW,na.action=na.omit)
+caret::confusionMatrix(test_NB_Pred,test_data_model_BOW[,1],mode="prec_recall")
+
+
+## Decision Tree
+BOW_ctree <-train(sentiment ~ X2 + anxiety + worse + horrible + 
+    severe + great + works + better + taking + effects + depression + 
+    nausea + stopped + first + weight + worked + still + helped + 
+    birth + headaches + control + never + recommend + weeks + 
+    doctor + X3 + since + sleep + little + medication + every + 
+    later + tried + hours + using + medicine + experience + times + 
+    right + taken + effect + normal + without + finally + nothing + 
+    thing + period + within + cramps + experienced + noticed + 
+    around,data =train_data_model_BOW,method="ctree",trControl=train_control)
+train_ctree_pred<-predict(BOW_ctree, newdata= train_data_model_BOW)
+caret::confusionMatrix(train_ctree_pred,train_data_model_BOW[,1],mode="prec_recall")
+test_ctree_Pred <- predict(BOW_ctree, newdata= test_data_model_BOW,na.action=na.omit())
+caret::confusionMatrix(test_ctree_Pred,test_data_model_BOW[,1],mode="prec_recall")
+
+
+## Random Forest
+BOW_RF<-randomForest::randomForest(sentiment ~ X2 + anxiety + worse + horrible + 
+    severe + great + works + better + taking + effects + depression + 
+    nausea + stopped + first + weight + worked + still + helped + 
+    birth + headaches + control + never + recommend + weeks + 
+    doctor + X3 + since + sleep + little + medication + every + 
+    later + tried + hours + using + medicine + experience + times + 
+    right + taken + effect + normal + without + finally + nothing + 
+    thing + period + within + cramps + experienced + noticed + 
+    around,data =train_data_model_BOW,doTrace=TRUE,ntree=100,mtry=10)
+train_RF_pred<-predict(BOW_RF, newdata= train_data_model_BOW)
+test_RF_Pred <- predict(BOW_RF, newdata= test_data_model_BOW)
+caret::confusionMatrix(test_RF_Pred,test_data_model_BOW[,1],mode="prec_recall")
+
+## Support Vector Machine
+BOW_svm<-train(sentiment ~ X2 + anxiety + worse + horrible + 
+    severe + great + works + better + taking + effects + depression + 
+    nausea + stopped + first + weight + worked + still + helped + 
+    birth + headaches + control + never + recommend + weeks + 
+    doctor + X3 + since + sleep + little + medication + every + 
+    later + tried + hours + using + medicine + experience + times + 
+    right + taken + effect + normal + without + finally + nothing + 
+    thing + period + within + cramps + experienced + noticed + 
+    around,data =train_data_model_BOW,method="svm",trControl=train_control)
+train_svm_Pred <- predict(BOW_svm, newdata= train_data_model_BOW)
+test_svm_Pred<- predict(BOW_svm, newdata= test_data_model_BOW)
+confusionMatrix(train_svm_Pred,train_data_model_BOW[,1],mode="prec_recall")
+confusionMatrix(test_svm_Pred,test_data_model_BOW[,1],mode="prec_recall")
